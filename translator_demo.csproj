@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="BreakSentence.cs" />
+    <Compile Remove="Detect.cs" />
+    <Compile Remove="DictionaryExamples.cs" />
+    <Compile Remove="DictionaryLookup.cs" />
+    <Compile Remove="Languages.cs" />
+    <Compile Remove="Translate.cs" />
+    <Compile Remove="Transliterate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
