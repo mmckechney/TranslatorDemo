@@ -11,10 +11,11 @@ using Newtonsoft.Json;
 using translator_demo;
 using translator_demo.Models;
 
+
 namespace TranslateTextSample
 {
 
-    class Program
+    public class Program
     {
 
         private const string region_var = "TRANSLATOR_SERVICE_REGION";
@@ -51,73 +52,8 @@ namespace TranslateTextSample
             }
         }
 
-        // Async call to the Translator Text API
-        static public async Task<List<TranslationResult>> TranslateTextRequest(string subscriptionKey, string endpoint, string route, string inputText)
-        {
-            object[] body = new object[] { new { Text = inputText } };
-            var requestBody = JsonConvert.SerializeObject(body);
-            List<TranslationResult> translationRes = new();
-            using (var client = new HttpClient())
-            using(var request = new HttpRequestMessage())
-            {
-                // Build the request.
-                request.Method = HttpMethod.Post;
-                request.RequestUri = new Uri(endpoint + route);
-                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
-                request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
-                request.Headers.Add("Ocp-Apim-Subscription-Region", region);
-
-                // Send the request and get response.
-                HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
-                // Read response as a string.
-                string result = await response.Content.ReadAsStringAsync();
-                translationRes = JsonConvert.DeserializeObject<List<TranslationResult>>(result);
-                translationRes[0].MeteredUsage = response.Headers.Contains("X-Metered-Usage") ? response.Headers.GetValues("X-Metered-Usage").First() : "Usage not found";
-                // Iterate over the deserialized results.
-                foreach (TranslationResult o in translationRes)
-                {
-                    // Print the detected input languge and confidence score.
-                    Console.WriteLine("Detected input language: {0}\nConfidence score: {1}\n", o.DetectedLanguage.Language, o.DetectedLanguage.Score);
-                    // Iterate over the results and print each translation.
-                    foreach (Translation t in o.Translations)
-                    {
-                        if (t.Transliteration == null)
-                        {
-
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.Write($"Translated to {t.To}: ");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Console.WriteLine($"{t.Text} ");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Console.WriteLine();
-                        }
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.Write($"Translated to {t.To}: ");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Console.Write($"{t.Text} ");
-                            Console.ForegroundColor = ConsoleColor.Blue;
-                            Console.WriteLine($" {t.Transliteration.Text} ");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Console.WriteLine();
-                        }
-                    }
-                }
-            }
-
-            Console.WriteLine($"Metered Usage: {translationRes[0].MeteredUsage}");
-
-            return translationRes;
-        }
-
-
-
-
-
         static async Task Main(string[] args)
         {
-
             while (true)
             {
                 Console.WriteLine();
@@ -133,9 +69,23 @@ namespace TranslateTextSample
                     {
                         string route = "/translate?api-version=3.0&to=de&toScript=latn&to=it&toScript=latn&to=ja&toScript=latn&to=hi&toScript=latn&to=en&toScript=latn";
                         Console.Write("Type the phrase you'd like to translate? ");
-                        string textToTranslate = Console.ReadLine();
+                        var sb = new StringBuilder();   
+                        while(true)
+                        {
+                            var txt = Console.ReadLine();
+                            if(!txt.EndsWith("@"))
+                            {
+                                sb.AppendLine(txt);
+                            }
+                            else
+                            {
+                                sb.Append(txt.Substring(0,txt.Length -1));
+                                break;
+                            }
+                        }
+                        string textToTranslate = sb.ToString();
                         Console.WriteLine();
-                        var res = await TranslateTextRequest(subscriptionKey, endpoint, route, textToTranslate);
+                        var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, route, textToTranslate);
                         Console.WriteLine();
 
 
@@ -150,16 +100,6 @@ namespace TranslateTextSample
 
                 }
             }
-            // This is our main function.
-            // Output languages are defined in the route.
-            // For a complete list of options, see API reference.
-            // https://docs.microsoft.com/azure/cognitive-services/translator/reference/v3-0-translate
-            
-            // Prompts you for text to translate. If you'd prefer, you can
-            // provide a string as textToTranslate.
-
-            
-
         }
     }
 }
