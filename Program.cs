@@ -88,7 +88,7 @@ namespace TranslateTextSample
             }
             else
             {
-                route = "/translate?api-version=3.0&to=de&toScript=latn&to=it&toScript=latn&to=ja&toScript=latn&to=hi&toScript=latn&to=en&toScript=latn&to=es&toScript=latn&category=619cb84d-bb3a-4cd3-9d3d-629777113e7b-ENERGY";
+                route = "/translate?api-version=3.0&to=de&toScript=latn&to=it&toScript=latn&to=ja&toScript=latn&to=hi&toScript=latn&to=en&toScript=latn&to=es&toScript=latn";
             }
 
             while (true)
