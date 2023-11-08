@@ -81,10 +81,28 @@ namespace TranslateTextSample
         static async Task Main(string[] args)
         {
             string route;
+            bool useCustom = false;
             if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
             {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write("A custom translator configuration is available. Do you want to use it? (y/n) ");
+                var selection = Console.ReadLine();
+                if(selection.ToLower().StartsWith("y"))
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"Custom translator selected and will be used for tranlations to {customToLan}.");
+                    useCustom = true;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Standard translator will be used for translations.");
+                }
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+
+            if (useCustom) {
                 route = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
-                Console.Write($"Using custom translator to translate to {customToLan}");
             }
             else
             {
@@ -101,7 +119,7 @@ namespace TranslateTextSample
                 var entry = Console.ReadLine();
             if (entry.StartsWith("1"))
             {
-                Console.WriteLine("Text Translation selected (end your line with an @ symbol and press return to translate):");
+                Console.WriteLine("Text Translation selected (multi-line enabled. End your last line with an @ symbol and press return to translate):");
                 Console.WriteLine();
 
 
