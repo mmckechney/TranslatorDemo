@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using translator_demo;
 using translator_demo.Models;
+using Spectre.Console;
 
 
 namespace TranslateTextSample
@@ -80,6 +81,8 @@ namespace TranslateTextSample
 
         static async Task Main(string[] args)
         {
+            AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
+
             string route;
             bool useCustom = false;
             if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
@@ -117,46 +120,67 @@ namespace TranslateTextSample
                 Console.WriteLine("1. Translate Text");
                 Console.WriteLine("2. Translate Documents");
                 var entry = Console.ReadLine();
-            if (entry.StartsWith("1"))
-            {
-                Console.WriteLine("Text Translation selected (multi-line enabled. End your last line with an @ symbol and press return to translate):");
-                Console.WriteLine();
-
-
-
-
-
-                Console.Write("Type the phrase you'd like to translate? ");
-                var sb = new StringBuilder();
-                while (true)
+                if (entry.StartsWith("1"))
                 {
-                    var txt = Console.ReadLine();
-                    if (!txt.EndsWith("@"))
+                    Console.WriteLine("Text Translation selected (multi-line enabled. End your last line with an @ symbol and press return to translate):");
+                    Console.WriteLine();
+
+
+
+
+
+                    Console.Write("Type the phrase you'd like to translate? ");
+                    var sb = new StringBuilder();
+                    while (true)
                     {
-                        sb.AppendLine(txt);
+                        var txt = Console.ReadLine();
+                        if (!txt.EndsWith("@"))
+                        {
+                            sb.AppendLine(txt);
+                        }
+                        else
+                        {
+                            sb.Append(txt.Substring(0, txt.Length - 1));
+                            break;
+                        }
                     }
-                    else
-                    {
-                        sb.Append(txt.Substring(0, txt.Length - 1));
-                        break;
-                    }
+                    string textToTranslate = sb.ToString();
+                    Console.WriteLine();
+                    var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, route, textToTranslate, region);
+                    Console.WriteLine();
+
+
+
+
                 }
-                string textToTranslate = sb.ToString();
-                Console.WriteLine();
-                var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, route, textToTranslate);
-                Console.WriteLine();
+                else if ((entry.StartsWith("2")))
+                {
+                    Console.WriteLine("Document Translation selected");
+                    Console.WriteLine();
+                    Console.WriteLine("Please select a target language for translation (use the two character language code):");
+                    Console.WriteLine("If you need help, the codes can be found here: https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support");
+                    var code = Console.ReadLine();
+                    Console.WriteLine();
+                    string path = "";
+                    while (true)
+                    {
+                        Console.WriteLine("Provide the full path to a document to upload and translate:");
+                        path = Console.ReadLine();
+                        if (!File.Exists(path))
+                        {
+                            Console.WriteLine("File not found. Please try again.");
+                            continue;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    var fileInfo = new FileInfo(path);
+                    Console.WriteLine();
+                    await DocumentTranslation.TranslateBlobDocs(code.ToLower().Trim(), fileInfo);
 
-
-
-
-            }
-            else if ((entry.StartsWith("2")))
-            {
-                Console.WriteLine("Document Translation selected");
-                Console.WriteLine();
-                await DocumentTranslation.TranslateBlobDocs();
-
-            }
+                }
             }
         }
     }

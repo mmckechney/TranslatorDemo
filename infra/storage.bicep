@@ -1,27 +1,7 @@
-param storageAccountName string 
-param translateAccountName string
+﻿param storageAccountName string 
 param location string = resourceGroup().location
 param sasStartDate string =  utcNow('u')
-resource translationServiceResource 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-  name: translateAccountName
-  location: location
-  sku: {
-    name: 'S1'
-  }
-  kind: 'TextTranslation'
-  identity: {
-    type: 'None'
-  }
-  properties: {
-    customSubDomainName: translateAccountName
-    networkAcls: {
-      defaultAction: 'Allow'
-      virtualNetworkRules: []
-      ipRules: []
-    }
-    publicNetworkAccess: 'Enabled'
-  }
-}
+
 
 resource storageAccountResource  'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
@@ -121,29 +101,21 @@ var incoming_sas = listServiceSas(storageAccountResource.name, '2021-04-01',
         canonicalizedResource: '/blob/${storageAccountResource.name}/${storageContainer_incoming.name}'
         signedResource: 'c'
         signedProtocol: 'https'
-        signedPermission: 'rwl'
+        signedPermission: 'racwdl'
         signedServices: 'b'
         signedExpiry: dateTimeAdd(sasStartDate, 'P1Y')
       }).serviceSasToken
 
-output incoming_url string = '${storageAccountResource.properties.primaryEndpoints.blob}${storageContainer_incoming.name}?${incoming_sas}'
 
 var translated_sas = listServiceSas(storageAccountResource.name, '2021-04-01',
       {
         canonicalizedResource: '/blob/${storageAccountResource.name}/${storageContainer_translated.name}'
         signedResource: 'c'
         signedProtocol: 'https'
-        signedPermission: 'rwl'
+        signedPermission: 'racwdl'
         signedServices: 'b'
         signedExpiry: dateTimeAdd(sasStartDate, 'P1Y')
       }).serviceSasToken
 
+output incoming_url string = '${storageAccountResource.properties.primaryEndpoints.blob}${storageContainer_incoming.name}?${incoming_sas}'
 output translated_url string = '${storageAccountResource.properties.primaryEndpoints.blob}${storageContainer_translated.name}?${translated_sas}'
-
-
-      #disable-next-line outputs-should-not-contain-secrets
-output translatorKey string = translationServiceResource.listKeys().key1
-
-output translatorTextEndpoint string = translationServiceResource.properties.endpoints.textTranslation
-output translatorDocEndpoint string = translationServiceResource.properties.endpoints.documentTranslation
-output location string = translationServiceResource.location
