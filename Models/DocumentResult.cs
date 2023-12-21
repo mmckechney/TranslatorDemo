@@ -1,22 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text.Json.Serialization;
 
 namespace translator_demo.Models
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Text.Json.Serialization;
-
     public class DocumentResult
-    {
-        [JsonPropertyName("value")]
-        public List<Value> Value { get; set; }
-    }
-
-    public class Value
     {
         [JsonPropertyName("id")]
         public string Id { get; set; }
