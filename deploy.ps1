@@ -37,6 +37,7 @@ $translatorKey = az cognitiveservices account keys list --resource-group $resour
         "TRANSLATOR_SERVICE_REGION" = $result.properties.outputs.location.value
         "CUSTOM_TRANSLATOR_CATEGORY_ID" = ""
         "CUSTOM_TRANSLATOR_TO_LANGUAGE" = ""
+        "TEXT_TRANSLATION_LANGUAGES" = @("en", "es", "fr", "de", "it", "ja", "is", "hi", "zh-Hans")
 }
        
 

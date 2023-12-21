@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using translator_demo;
 using translator_demo.Models;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 
 namespace TranslateTextSample
@@ -46,6 +47,9 @@ namespace TranslateTextSample
         private const string custom_translator_to_lan = "CUSTOM_TRANSLATOR_TO_LANGUAGE";
         internal static string customToLan;
 
+        private const string text_translation_to_lan = "TEXT_TRANSLATION_LANGUAGES";
+        internal static string[] textToLans;
+
         static Program()
         {
             var config = new ConfigurationBuilder()
@@ -63,6 +67,7 @@ namespace TranslateTextSample
             targetBlobSas = config[target_blob_sas];
             customCatId = config[custom_translator_cat_id];
             customToLan = config[custom_translator_to_lan];
+            textToLans = config.GetSection(text_translation_to_lan).AsEnumerable().Select(a => a.Value).ToArray();
 
 
             if (null == region)
@@ -86,53 +91,44 @@ namespace TranslateTextSample
             AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
             Console.WriteLine("This demo tool will allow you to translate text or documents using Azure AI Translator.");
             Console.WriteLine("You can use the standard translator or a custom translator configuration.");
-            Console.WriteLine("The custom translator configuration (if any) is defined in the local.settings.json file.");
+            Console.WriteLine("The custom translator configuration (if any) and the selection of text translation languages are defined in the local.settings.json file.");
             Console.ForegroundColor = ConsoleColor.White;
             string route;
-            bool useCustom = false;
+            string customRoute = "";
+            
+
             if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
             {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write("A custom translator configuration is available. Do you want to use it? (y/n) ");
-                var selection = Console.ReadLine();
-                if(selection.ToLower().StartsWith("y"))
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"Custom translator selected and will be used for tranlations to {customToLan}.");
-                    useCustom = true;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("Standard translator will be used for translations.");
-                }
-                Console.ForegroundColor = ConsoleColor.White;
+                customRoute = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
             }
 
-            if (useCustom) {
-                route = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
-            }
-            else
+            route = "/translate?api-version=3.0";
+            foreach(var lan in textToLans)
             {
-                route = "/translate?api-version=3.0&to=de&toScript=latn&to=it&toScript=latn&to=ja&toScript=latn&to=hi&toScript=latn&to=en&toScript=latn&to=es&toScript=latn";
+                if(!string.IsNullOrEmpty(lan)) route += $"&to={lan}&toScript=latn";
             }
+
 
             while (true)
-            { 
-               
-            Console.WriteLine();
+            {
+
+                Console.WriteLine();
                 Console.WriteLine("Please make a selection:");
                 Console.WriteLine("1. Translate Text");
                 Console.WriteLine("2. Translate Documents");
+                if (!string.IsNullOrWhiteSpace(customRoute))
+                { 
+                    Console.WriteLine("3. Translate Text with Custom Translator");
+                }
                 var entry = Console.ReadLine();
-                if (entry.StartsWith("1"))
+                if (entry.StartsWith("1") || entry.StartsWith("3"))
                 {
+                    if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
+                    {
+                        Console.Write("Custom ");
+                    }
                     Console.WriteLine("Text Translation selected (multi-line enabled. End your last line with an @ symbol and press return to translate):");
                     Console.WriteLine();
-
-
-
-
 
                     Console.Write("Type the phrase you'd like to translate? ");
                     var sb = new StringBuilder();
@@ -151,12 +147,15 @@ namespace TranslateTextSample
                     }
                     string textToTranslate = sb.ToString();
                     Console.WriteLine();
-                    var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, route, textToTranslate, region);
+
+                    var routeToUse = route;
+                    if(entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
+                    {
+                        routeToUse = customRoute;
+                    }
+
+                    var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, routeToUse, textToTranslate, region);
                     Console.WriteLine();
-
-
-
-
                 }
                 else if ((entry.StartsWith("2")))
                 {
