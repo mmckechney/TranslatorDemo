@@ -23,30 +23,50 @@ namespace translator_demo
 
 
         static readonly string route = "/batches";
-        static readonly string sourceURL = $"\"{Program.sourceBlobSas}\"";
-        static readonly string targetURL = $" \"{Program.targetBlobSas}\"";
         private static HttpClient client = new HttpClient();
-
-
-        static readonly string json = ("{\"inputs\": [{\"source\": {\"sourceUrl\":" + sourceURL + " ,\"storageSource\": \"AzureBlob\",\"language\": \"en\"}, \"targets\": [{\"targetUrl\":\"<<targetUrl>>\",\"storageSource\": \"AzureBlob\",\"category\": \"general\",\"language\": \"<<targetLanguage>>\"}]}]}");
-
+        private static string RequestJson { get; set; }
+        private static string TargetFileName { get; set; }
         public static async Task TranslateBlobDocs(string targetLanguageCode, FileInfo docToTranslate)
         {
+            (Uri targetUri, string targetSas) = GetContainerUriAndSas(Program.targetBlobSas);
+            (Uri sourceUri, string sourceSas) = GetContainerUriAndSas(Program.sourceBlobSas);
+            TargetFileName = $"{targetLanguageCode}/{Path.GetFileNameWithoutExtension(docToTranslate.Name)}_{targetLanguageCode}{Path.GetExtension(docToTranslate.Name)}";
+            var reqDoc = new DocumentRequest()
+            {
+                Inputs = new List<Input>
+                {
+                    new Input
+                    {
+                        Source = new Source
+                        {
+                            SourceUrl = $"{sourceUri.AbsoluteUri}/{docToTranslate.Name}?{sourceSas}"//Program.sourceBlobSas
+                        },
+                        Targets = new List<Target>
+                        {
+                            new Target
+                            {
+                                TargetUrl = $"{targetUri.AbsoluteUri}/{DocumentTranslation.TargetFileName}?{targetSas}",
+                                Language = targetLanguageCode
+                            }
+                        }
+                    }
+                }
+            };
+            DocumentTranslation.RequestJson = JsonSerializer.Serialize<DocumentRequest>(reqDoc, new JsonSerializerOptions() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            //Console.WriteLine(DocumentTranslation.RequestJson);
             var uploaded = await UploadBlobForTranslation(docToTranslate, targetLanguageCode);
             if(!uploaded)
             {
                 Console.WriteLine("File upload failed. Exiting");
                 return;
             }
+          
 
-            var jsonWithCode = json.Replace("<<targetLanguage>>", targetLanguageCode);
-            (Uri targetUri, string targetSas) = GetContainerUriAndSas(Program.targetBlobSas);
-            jsonWithCode = jsonWithCode.Replace("<<targetUrl>>", $"{targetUri.AbsoluteUri}/{targetLanguageCode}?{targetSas}");
             var createTime = DateTime.UtcNow;
             using HttpRequestMessage request = new HttpRequestMessage();
             {
 
-                StringContent content = new StringContent(jsonWithCode, Encoding.UTF8, "application/json");
+                StringContent content = new StringContent(DocumentTranslation.RequestJson, Encoding.UTF8, "application/json");
 
                 request.Method = HttpMethod.Post;
                 request.RequestUri = new Uri(endpoint + route);
@@ -57,10 +77,12 @@ namespace translator_demo
                 string result = response.Content.ReadAsStringAsync().Result;
                 if (response.IsSuccessStatusCode)
                 {
+                    var operationUrl = response.Headers.GetValues("Operation-Location").FirstOrDefault();
+
                     Console.WriteLine($"Status code: {response.StatusCode}");
                     Console.WriteLine("Document translation accepted");
 
-                   var success =  await CheckTranslationStatus(createTime);
+                   var success =  await CheckTranslationStatus(operationUrl);
                     if(success)
                     {
                         await DownloadTranslatedDocument(docToTranslate, targetLanguageCode);
@@ -69,25 +91,35 @@ namespace translator_demo
                 else
                 {
                     Console.WriteLine($"Status code: {response.StatusCode}");
-                    Console.Write("Error");
+                    if (result.ToLower().Contains("invalidtolanguage"))
+                    {
+                        Console.WriteLine($"Invalid target language code. Please try again with a valid code.{Environment.NewLine}See https://docs.microsoft.com/en-us/azure/cognitive-services/translator/language-support for a list of supported language codes");
+                    }
+                    else
+                    {
+                        Console.WriteLine(result);
+                    }
+                    Console.WriteLine();
+                    Console.WriteLine();
                 }
 
             }
 
         }
 
-        public static async Task<bool> CheckTranslationStatus(DateTime createdTime) 
+        public static async Task<bool> CheckTranslationStatus(string operationUrl) 
         {
+            int sleepTime = 2000;
             Console.WriteLine("Checking status of document translation:");
             while(true)
             {
                 using HttpRequestMessage request = new HttpRequestMessage();
                 {
 
-                    StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
+                    StringContent content = new StringContent(DocumentTranslation.RequestJson, Encoding.UTF8, "application/json");
 
                     request.Method = HttpMethod.Get;
-                    request.RequestUri = new Uri(endpoint + route + $"?createdDateTimeUtcStart={createdTime.ToString()}");
+                    request.RequestUri = new Uri(operationUrl);
                     request.Headers.Add("Ocp-Apim-Subscription-Key", key);
                     request.Content = content;
 
@@ -95,8 +127,17 @@ namespace translator_demo
                     string result = response.Content.ReadAsStringAsync().Result;
                     if (response.IsSuccessStatusCode)
                     {
-                        var resObj = JsonSerializer.Deserialize<DocumentResult>(result).Value.First();
-                        var status = resObj.Status.ToLower();
+                        DocumentResult resObj = null;
+                        try
+                        {
+                            resObj = JsonSerializer.Deserialize<DocumentResult>(result);
+                        }
+                        catch(Exception)
+                        {
+                            Console.WriteLine("Waiting for response");
+                            Thread.Sleep(sleepTime);
+                        }
+                        var status = resObj?.Status?.ToLower();
                         switch(status)
                         {
                             case "notstarted":
@@ -113,8 +154,8 @@ namespace translator_demo
                                 Console.WriteLine($"\tTranslation failed: {resObj.Error?.Message}");
                                 return false;
                             default:
-                                Console.WriteLine($"\tStatus: {resObj.Status}");
-                                if (resObj.Error != null)
+                                Console.WriteLine($"\tStatus: {resObj?.Status}");
+                                if (resObj?.Error != null)
                                 {
                                     Console.WriteLine($"\tError message: {resObj.Error.Message}");
                                     return false;
@@ -132,7 +173,7 @@ namespace translator_demo
 
                 }
 
-                Thread.Sleep(10000);
+                Thread.Sleep(sleepTime);
             }
         }
 
@@ -175,10 +216,10 @@ namespace translator_demo
             {
                 (Uri containerUrl, string signature) = GetContainerUriAndSas(Program.targetBlobSas);
                 var containerClient = new BlobContainerClient(containerUrl, new AzureSasCredential(signature));
-                var blobClient = containerClient.GetBlobClient($"{targetLanguageCode}/{file.Name}");
-                string translatedFileName = Path.Combine(file.Directory.FullName, file.Name.Replace(file.Extension, $"_{targetLanguageCode}{file.Extension}"));
-                await blobClient.DownloadToAsync(translatedFileName);
-                Console.WriteLine($"Translated document saved to:\t {translatedFileName}");
+                var blobClient = containerClient.GetBlobClient($"{DocumentTranslation.TargetFileName}");
+                string localFile = Path.Combine(file.Directory.FullName, Path.GetFileName(DocumentTranslation.TargetFileName));
+                await blobClient.DownloadToAsync(localFile);
+                Console.WriteLine($"Translated document saved to:\t {localFile}");
                 return true;
             }
             catch(Exception exe)
@@ -203,7 +244,7 @@ namespace translator_demo
             {
                 (Uri containerUrl, string signature) = GetContainerUriAndSas(containerSasUri);
                 var containerClient = new BlobContainerClient(containerUrl, new AzureSasCredential(signature));
-                var blobClient = containerClient.GetBlobClient($"{targetLanguageCode}/{file.Name}");
+               var blobClient = containerClient.GetBlobClient($"{DocumentTranslation.TargetFileName}");
                 blobClient.DeleteIfExists();
             }
             catch(Exception exe)
