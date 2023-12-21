@@ -81,8 +81,13 @@ namespace TranslateTextSample
 
         static async Task Main(string[] args)
         {
-            AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
+            Console.ForegroundColor = ConsoleColor.Blue;
 
+            AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
+            Console.WriteLine("This demo tool will allow you to translate text or documents using Azure AI Translator.");
+            Console.WriteLine("You can use the standard translator or a custom translator configuration.");
+            Console.WriteLine("The custom translator configuration (if any) is defined in the local.settings.json file.");
+            Console.ForegroundColor = ConsoleColor.White;
             string route;
             bool useCustom = false;
             if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))

@@ -53,7 +53,7 @@ namespace translator_demo
                 }
             };
             DocumentTranslation.RequestJson = JsonSerializer.Serialize<DocumentRequest>(reqDoc, new JsonSerializerOptions() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-            Console.WriteLine(DocumentTranslation.RequestJson);
+            //Console.WriteLine(DocumentTranslation.RequestJson);
             var uploaded = await UploadBlobForTranslation(docToTranslate, targetLanguageCode);
             if(!uploaded)
             {
@@ -91,7 +91,16 @@ namespace translator_demo
                 else
                 {
                     Console.WriteLine($"Status code: {response.StatusCode}");
-                    Console.Write("Error");
+                    if (result.ToLower().Contains("invalidtolanguage"))
+                    {
+                        Console.WriteLine($"Invalid target language code. Please try again with a valid code.{Environment.NewLine}See https://docs.microsoft.com/en-us/azure/cognitive-services/translator/language-support for a list of supported language codes");
+                    }
+                    else
+                    {
+                        Console.WriteLine(result);
+                    }
+                    Console.WriteLine();
+                    Console.WriteLine();
                 }
 
             }
