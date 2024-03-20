@@ -181,7 +181,7 @@ namespace translator_demo
                string path = "";
                while (true)
                {
-                  log.LogInformation("Provide the full pth to a document to upload and translate:");
+                  log.LogInformation("Provide the full path to a document to upload and translate:");
                   path = Console.ReadLine().Replace("\"", "");
                   if (!File.Exists(path))
                   {
