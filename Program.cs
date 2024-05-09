@@ -83,48 +83,14 @@ namespace translator_demo
 
       static async Task Main(string[] args)
       {
-         var loglevel = SetLogLevel(args);
-         logFactory = LoggerFactory.Create(builder =>
-         {
-            builder.SetMinimumLevel(loglevel);
-            builder.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
-            builder.AddConsole(options =>
-            {
-               options.FormatterName = "custom";
+         SetupLogging(args);
+         DisplayIntro();
 
-            });
-            builder.AddFilter("Microsoft", LogLevel.Warning);
-            builder.AddFilter("System", LogLevel.Warning);
-         });
-         log = logFactory.CreateLogger("Program");
-
-
-         Console.ForegroundColor = ConsoleColor.Blue;
-
-         AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
-         Console.WriteLine("This demo tool will allow you to translate text or documents using Azure AI Translator.");
-         Console.WriteLine("You can use the standard translator or a custom translator configuration.");
-         Console.WriteLine("The custom translator configuration (if any) and the selection of text translation languages are defined in the local.settings.json file.");
-         Console.ForegroundColor = ConsoleColor.White;
-         string route;
-         string customRoute = "";
-
-
-         if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
-         {
-            customRoute = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
-         }
-
-         route = "/translate?api-version=3.0";
-         foreach (var lan in textToLans)
-         {
-            if (!string.IsNullOrEmpty(lan)) route += $"&to={lan}&toScript=latn";
-         }
-
+         string route = BuildRoute();
+         string customRoute = BuildCustomRoute();
 
          while (true)
          {
-
             Console.WriteLine();
             log.LogInformation("Please make a selection:");
             log.LogInformation("1. Translate Text");
@@ -136,70 +102,251 @@ namespace translator_demo
             var entry = Console.ReadLine();
             if (entry.StartsWith("1") || entry.StartsWith("3"))
             {
-               if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
-               { 
-                  Console.Write("Custom ");
-               }
-               log.LogInformation(new() { { "Text Translation selected ", ConsoleColor.White }, { "(Multi-line enabled. End your last line with an @ symbol and press return to translate):", ConsoleColor.Cyan } });
-               Console.WriteLine();
-
-               log.LogInformation("Type the phrase you'd like to translate? ");
-               var sb = new StringBuilder();
-               while (true)
-               {
-                  var txt = Console.ReadLine();
-                  if (!txt.EndsWith("@"))
-                  {
-                     sb.AppendLine(txt);
-                  }
-                  else
-                  {
-                     sb.Append(txt.Substring(0, txt.Length - 1));
-                     break;
-                  }
-               }
-               string textToTranslate = sb.ToString().Trim();
-               Console.WriteLine();
-
-               var routeToUse = route;
-               if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
-               {
-                  routeToUse = customRoute;
-               }
-
-               var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, routeToUse, textToTranslate, region,log);
-               Console.WriteLine();
+               await HandleTextTranslation(entry, route, customRoute);
             }
             else if (entry.StartsWith("2"))
             {
-               log.LogInformation("Document Translation selected");
-               log.LogInformation("");
-               log.LogInformation(new() { { "Please select a target language for translation", ConsoleColor.White }, { "(use the two character language code):", ConsoleColor.DarkYellow } });
-               log.LogInformation("If you need help, the codes can be found here: https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support");
-               var code = Console.ReadLine();
-               Console.WriteLine();
-               string path = "";
-               while (true)
-               {
-                  log.LogInformation("Provide the full path to a document to upload and translate:");
-                  path = Console.ReadLine().Replace("\"", "");
-                  if (!File.Exists(path))
-                  {
-                     log.LogInformation("File not found. Please try again.", ConsoleColor.Red);
-                     continue;
-                  }
-                  else
-                  {
-                     break;
-                  }
-               }
-               var fileInfo = new FileInfo(path);
-               Console.WriteLine();
-               await DocumentTranslation.TranslateBlobDocs(code.ToLower().Trim(), fileInfo, log);
-
+               await HandleDocumentTranslation();
             }
          }
       }
+
+      private static void SetupLogging(string[] args)
+      {
+         var loglevel = SetLogLevel(args);
+         logFactory = LoggerFactory.Create(builder =>
+         {
+            builder.SetMinimumLevel(loglevel);
+            builder.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
+            builder.AddConsole(options =>
+            {
+               options.FormatterName = "custom";
+            });
+            builder.AddFilter("Microsoft", LogLevel.Warning);
+            builder.AddFilter("System", LogLevel.Warning);
+         });
+         log = logFactory.CreateLogger("Program");
+      }
+
+      private static void DisplayIntro()
+      {
+         Console.ForegroundColor = ConsoleColor.Blue;
+         AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
+         Console.WriteLine("This demo tool will allow you to translate text or documents using Azure AI Translator.");
+         Console.WriteLine("You can use the standard translator or a custom translator configuration.");
+         Console.WriteLine("The custom translator configuration (if any) and the selection of text translation languages are defined in the local.settings.json file.");
+         Console.ForegroundColor = ConsoleColor.White;
+      }
+
+      private static string BuildRoute()
+      {
+         string route = "/translate?api-version=3.0";
+         foreach (var lan in textToLans)
+         {
+            if (!string.IsNullOrEmpty(lan)) route += $"&to={lan}&toScript=latn";
+         }
+         return route;
+      }
+
+      private static string BuildCustomRoute()
+      {
+         string customRoute = "";
+         if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
+         {
+            customRoute = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
+         }
+         return customRoute;
+      }
+
+      private static async Task HandleTextTranslation(string entry, string route, string customRoute)
+      {
+         if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
+         {
+            Console.Write("Custom ");
+         }
+         log.LogInformation(new() { { "Text Translation selected ", ConsoleColor.White }, { "(Multi-line enabled. End your last line with an @ symbol and press return to translate):", ConsoleColor.Cyan } });
+         Console.WriteLine();
+
+         log.LogInformation("Type the phrase you'd like to translate? ");
+         string textToTranslate = GetTextToTranslate();
+         Console.WriteLine();
+
+         var routeToUse = entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute) ? customRoute : route;
+         var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, routeToUse, textToTranslate, region, log);
+         Console.WriteLine();
+      }
+
+      private static string GetTextToTranslate()
+      {
+         var sb = new StringBuilder();
+         while (true)
+         {
+            var txt = Console.ReadLine();
+            if (!txt.EndsWith("@"))
+            {
+               sb.AppendLine(txt);
+            }
+            else
+            {
+               sb.Append(txt.Substring(0, txt.Length - 1));
+               break;
+            }
+         }
+         return sb.ToString().Trim();
+      }
+
+      private static async Task HandleDocumentTranslation()
+      {
+         log.LogInformation("Document Translation selected");
+         log.LogInformation("");
+         log.LogInformation(new() { { "Please select a target language for translation", ConsoleColor.White }, { "(use the two character language code):", ConsoleColor.DarkYellow } });
+         log.LogInformation("If you need help, the codes can be found here: https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support");
+         var code = Console.ReadLine();
+         Console.WriteLine();
+         var fileInfo = GetFileInfo();
+         Console.WriteLine();
+         await DocumentTranslation.TranslateBlobDocs(code.ToLower().Trim(), fileInfo, log);
+      }
+
+      private static FileInfo GetFileInfo()
+      {
+         string path = "";
+         while (true)
+         {
+            log.LogInformation("Provide the full path to a document to upload and translate:");
+            path = Console.ReadLine().Replace("\"", "");
+            if (!File.Exists(path))
+            {
+               log.LogInformation("File not found. Please try again.", ConsoleColor.Red);
+               continue;
+            }
+            else
+            {
+               break;
+            }
+         }
+         return new FileInfo(path);
+      }
+
+      //static async Task Main(string[] args)
+      //{
+      //   var loglevel = SetLogLevel(args);
+      //   logFactory = LoggerFactory.Create(builder =>
+      //   {
+      //      builder.SetMinimumLevel(loglevel);
+      //      builder.AddConsoleFormatter<CustomConsoleFormatter, ConsoleFormatterOptions>();
+      //      builder.AddConsole(options =>
+      //      {
+      //         options.FormatterName = "custom";
+
+      //      });
+      //      builder.AddFilter("Microsoft", LogLevel.Warning);
+      //      builder.AddFilter("System", LogLevel.Warning);
+      //   });
+      //   log = logFactory.CreateLogger("Program");
+
+
+      //   Console.ForegroundColor = ConsoleColor.Blue;
+
+      //   AnsiConsole.Write(new FigletText("Azure AI Translation Demo"));
+      //   Console.WriteLine("This demo tool will allow you to translate text or documents using Azure AI Translator.");
+      //   Console.WriteLine("You can use the standard translator or a custom translator configuration.");
+      //   Console.WriteLine("The custom translator configuration (if any) and the selection of text translation languages are defined in the local.settings.json file.");
+      //   Console.ForegroundColor = ConsoleColor.White;
+      //   string route;
+      //   string customRoute = "";
+
+
+      //   if (!string.IsNullOrEmpty(customCatId) && !string.IsNullOrEmpty(customToLan))
+      //   {
+      //      customRoute = $"/translate?api-version=3.0&to={customToLan}&category={customCatId}";
+      //   }
+
+      //   route = "/translate?api-version=3.0";
+      //   foreach (var lan in textToLans)
+      //   {
+      //      if (!string.IsNullOrEmpty(lan)) route += $"&to={lan}&toScript=latn";
+      //   }
+
+
+      //   while (true)
+      //   {
+
+      //      Console.WriteLine();
+      //      log.LogInformation("Please make a selection:");
+      //      log.LogInformation("1. Translate Text");
+      //      log.LogInformation("2. Translate Documents");
+      //      if (!string.IsNullOrWhiteSpace(customRoute))
+      //      {
+      //         log.LogInformation("3. Translate Text with Custom Translator");
+      //      }
+      //      var entry = Console.ReadLine();
+      //      if (entry.StartsWith("1") || entry.StartsWith("3"))
+      //      {
+      //         if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
+      //         { 
+      //            Console.Write("Custom ");
+      //         }
+      //         log.LogInformation(new() { { "Text Translation selected ", ConsoleColor.White }, { "(Multi-line enabled. End your last line with an @ symbol and press return to translate):", ConsoleColor.Cyan } });
+      //         Console.WriteLine();
+
+      //         log.LogInformation("Type the phrase you'd like to translate? ");
+      //         var sb = new StringBuilder();
+      //         while (true)
+      //         {
+      //            var txt = Console.ReadLine();
+      //            if (!txt.EndsWith("@"))
+      //            {
+      //               sb.AppendLine(txt);
+      //            }
+      //            else
+      //            {
+      //               sb.Append(txt.Substring(0, txt.Length - 1));
+      //               break;
+      //            }
+      //         }
+      //         string textToTranslate = sb.ToString().Trim();
+      //         Console.WriteLine();
+
+      //         var routeToUse = route;
+      //         if (entry.StartsWith("3") && !string.IsNullOrWhiteSpace(customRoute))
+      //         {
+      //            routeToUse = customRoute;
+      //         }
+
+      //         var res = await TextTranslation.TranslateTextRequest(subscriptionKey, endpoint, routeToUse, textToTranslate, region,log);
+      //         Console.WriteLine();
+      //      }
+      //      else if (entry.StartsWith("2"))
+      //      {
+      //         log.LogInformation("Document Translation selected");
+      //         log.LogInformation("");
+      //         log.LogInformation(new() { { "Please select a target language for translation", ConsoleColor.White }, { "(use the two character language code):", ConsoleColor.DarkYellow } });
+      //         log.LogInformation("If you need help, the codes can be found here: https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support");
+      //         var code = Console.ReadLine();
+      //         Console.WriteLine();
+      //         string path = "";
+      //         while (true)
+      //         {
+      //            log.LogInformation("Provide the full path to a document to upload and translate:");
+      //            path = Console.ReadLine().Replace("\"", "");
+      //            if (!File.Exists(path))
+      //            {
+      //               log.LogInformation("File not found. Please try again.", ConsoleColor.Red);
+      //               continue;
+      //            }
+      //            else
+      //            {
+      //               break;
+      //            }
+      //         }
+      //         var fileInfo = new FileInfo(path);
+      //         Console.WriteLine();
+      //         await DocumentTranslation.TranslateBlobDocs(code.ToLower().Trim(), fileInfo, log);
+
+      //      }
+      //   }
+      //}
 
       private static LogLevel SetLogLevel(string[] args)
       {
